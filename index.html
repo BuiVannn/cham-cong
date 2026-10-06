@@ -2,57 +2,150 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ec">
 <title>Chấm công</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 420px; margin: 0 auto; padding: 24px 16px; background: #f5f5f5; color: #222; }
-  h2 { text-align: center; }
-  .card { background: #fff; border-radius: 12px; padding: 16px; margin: 12px 0; box-shadow: 0 1px 4px #0001; display: flex; align-items: center; gap: 12px; }
-  .card div { flex: 1; } .card b { font-size: 20px; } .card small { color: #666; }
-  button { font-size: 17px; font-weight: 600; padding: 14px 18px; border: 0; border-radius: 10px; color: #fff; background: #16a34a; min-width: 110px; }
-  button.out { background: #dc2626; }
-  button:disabled { opacity: .5; }
-  #msg { text-align: center; min-height: 1.5em; }
-  .err { color: #dc2626; } .ok { color: #16a34a; font-weight: 600; }
+  main { max-width: 440px; margin: 0 auto; padding: 32px 16px 48px; }
+  header { text-align: center; margin-bottom: 28px; }
+  .label { font-size: 13px; font-weight: 700; letter-spacing: .12em; color: var(--brand); text-transform: uppercase; }
+  #clock { font-size: 64px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; margin-top: 6px; }
+  #date { color: var(--muted); font-size: 16px; }
+
+  .hint { text-align: center; color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .staff { padding: 18px; margin-bottom: 12px; }
+  .staff .top { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .staff .name { font-size: 20px; font-weight: 700; }
+  .staff .sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .staff .btn { width: 100%; padding: 16px; font-size: 18px; border-radius: 14px; }
+  .skeleton { height: 150px; background: linear-gradient(90deg, #fff 30%, #f5f5f4 50%, #fff 70%) 0 0 / 300% 100%; animation: sh 1.2s infinite; }
+  @keyframes sh { to { background-position: -150% 0; } }
+
+  #toast { position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); max-width: 408px; margin: 0 auto; padding: 14px 16px; border-radius: 14px; background: #7f1d1d; color: #fff; font-size: 15px; box-shadow: var(--shadow); }
+
+  #sheet { margin: auto auto 0; width: 100%; max-width: 440px; border-radius: 24px 24px 0 0; padding: 24px 20px max(24px, env(safe-area-inset-bottom)); text-align: center; }
+  #sheet .avatar { width: 64px; height: 64px; font-size: 28px; margin: 0 auto 12px; }
+  #sheet .big { font-size: 40px; font-weight: 800; margin: 4px 0; }
+
+  #done { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; color: #fff; padding: 24px; animation: fade .2s; }
+  #done.in { background: var(--in); } #done.out { background: var(--out); }
+  #done svg { width: 96px; height: 96px; margin: 0 auto 16px; }
+  #done .t1 { font-size: 26px; font-weight: 700; } #done .t2 { font-size: 56px; font-weight: 800; }
+  @keyframes fade { from { opacity: 0; transform: scale(.96); } }
 </style>
 </head>
 <body>
-<h2>Chấm công</h2>
-<div id="list">Đang tải...</div>
-<p id="msg"></p>
+<main>
+  <header>
+    <div class="label">Chấm công</div>
+    <div id="clock" class="num">--:--</div>
+    <div id="date"></div>
+  </header>
+  <p class="hint">Bấm nút dưới tên của bạn</p>
+  <div id="list"><div class="card staff skeleton"></div><div class="card staff skeleton"></div></div>
+</main>
+
+<div id="toast" hidden></div>
+
+<dialog id="sheet">
+  <div id="sAvatar" class="avatar"></div>
+  <div id="sText" class="muted"></div>
+  <div id="sTime" class="big num"></div>
+  <div class="muted" style="font-size:14px">Cần bật định vị để xác nhận bạn đang ở cửa hàng</div>
+  <div class="actions">
+    <button class="btn ghost" id="sNo">Huỷ</button>
+    <button class="btn" id="sYes">Xác nhận</button>
+  </div>
+</dialog>
+
+<div id="done" hidden>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg>
+  <div class="t1" id="dText"></div>
+  <div class="t2 num" id="dTime"></div>
+</div>
 
 <script src="api.js"></script>
 <script>
-const say = (t, cls = '') => { $('#msg').className = cls; $('#msg').textContent = t; };
+const DAYS = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+const now = () => new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+let board = [], pick = null, toastTimer;
 
-async function load() {
-  const board = await api('board');
-  $('#list').innerHTML = board.map(x => `<div class="card">
-      <div><b>${esc(x.ten)}</b><br><small>${x.vao ? 'Đang làm từ ' + esc(x.vao) : 'Chưa vào ca'}</small></div>
-      <button class="${x.vao ? 'out' : ''}" data-ten="${esc(x.ten)}" data-type="${x.vao ? 'out' : 'in'}">${x.vao ? 'RA CA' : 'VÀO CA'}</button>
+function tick() {
+  const d = new Date();
+  $('#clock').textContent = now();
+  $('#date').textContent = `${DAYS[d.getDay()]}, ${d.getDate()} tháng ${d.getMonth() + 1}`;
+}
+tick(); setInterval(tick, 1000);
+
+function toast(t) {
+  $('#toast').textContent = t; $('#toast').hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').hidden = true, 6000);
+}
+
+// "08:00" → thời gian đã làm tới giờ (ca qua đêm thì cộng 24h)
+function since(vao) {
+  const [h, m] = vao.split(':'), d = new Date();
+  let mins = d.getHours() * 60 + d.getMinutes() - (h * 60 + +m);
+  if (mins < 0) mins += 1440;
+  return hm(mins / 60);
+}
+
+function render() {
+  $('#list').innerHTML = board.map((x, i) => `
+    <div class="card staff">
+      <div class="top">
+        <div class="avatar c${i % 4}">${initial(x.ten)}</div>
+        <div>
+          <div class="name">${esc(x.ten)}</div>
+          <div class="sub">${x.vao
+            ? `<span class="pill on">Đang làm</span> từ ${esc(x.vao)} · ${since(x.vao)}`
+            : `<span class="pill off">Chưa vào ca</span>`}</div>
+        </div>
+      </div>
+      <button class="btn ${x.vao ? 'out' : 'in'}" data-i="${i}">${x.vao ? 'Ra ca' : 'Vào ca'}</button>
     </div>`).join('');
 }
 
+async function load() { board = await api('board'); render(); }
+setInterval(() => board.length && render(), 60000);
+
 $('#list').onclick = e => {
-  const b = e.target.closest('button');
+  const b = e.target.closest('button[data-i]');
   if (!b) return;
-  const { ten, type } = b.dataset, label = type === 'in' ? 'Vào ca' : 'Ra ca';
-  if (!confirm(`${ten} — ${label}?`)) return;
-  document.querySelectorAll('button').forEach(x => x.disabled = true);
-  say('Đang lấy vị trí...');
+  pick = board[b.dataset.i];
+  const i = +b.dataset.i;
+  $('#sAvatar').className = `avatar c${i % 4}`; $('#sAvatar').innerHTML = initial(pick.ten);
+  $('#sText').textContent = `${pick.ten} — ${pick.vao ? 'ra ca' : 'vào ca'} lúc`;
+  $('#sTime').textContent = now();
+  $('#sYes').className = `btn ${pick.vao ? 'out' : 'in'}`;
+  $('#sYes').textContent = pick.vao ? 'Xác nhận ra ca' : 'Xác nhận vào ca';
+  $('#sYes').disabled = false;
+  $('#sheet').showModal();
+};
+$('#sNo').onclick = () => $('#sheet').close();
+
+$('#sYes').onclick = () => {
+  const x = pick, type = x.vao ? 'out' : 'in';
+  $('#sYes').disabled = true; $('#sYes').textContent = 'Đang lấy vị trí...';
   navigator.geolocation.getCurrentPosition(async p => {
     try {
-      const t = await api('punch', { name: ten, type, lat: p.coords.latitude, lng: p.coords.longitude });
-      say(`✓ ${ten} ${label.toLowerCase()} lúc ${t.slice(11)}`, 'ok');
+      const t = await api('punch', { name: x.ten, type, lat: p.coords.latitude, lng: p.coords.longitude });
+      $('#sheet').close();
+      $('#done').className = type; $('#dText').textContent = `${x.ten} đã ${type === 'in' ? 'vào ca' : 'ra ca'}`;
+      $('#dTime').textContent = t.slice(11); $('#done').hidden = false;
+      setTimeout(() => $('#done').hidden = true, 2500);
       await load();
-    } catch (err) { say(err.message, 'err'); document.querySelectorAll('button').forEach(x => x.disabled = false); }
-  }, err => {
-    say('Không lấy được vị trí. Bật định vị (GPS) và cho phép truy cập vị trí. Nếu mở bằng Zalo không được: bấm ⋯ → Mở bằng trình duyệt.', 'err');
-    document.querySelectorAll('button').forEach(x => x.disabled = false);
+    } catch (err) { $('#sheet').close(); toast(err.message); }
+  }, () => {
+    $('#sheet').close();
+    toast('Không lấy được vị trí. Hãy bật Định vị và cho phép trang truy cập vị trí. Nếu đang mở trong Zalo: bấm ⋯ → Mở bằng trình duyệt.');
   }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
 };
 
-load().catch(e => say(e.message, 'err'));
+load().catch(e => toast(e.message));
 </script>
 </body>
 </html>

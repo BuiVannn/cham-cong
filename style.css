@@ -1,0 +1,42 @@
+:root {
+  --bg: #f4f1ec; --card: #fff; --ink: #1c1917; --muted: #78716c; --line: #e7e2da;
+  --brand: #0f766e; --brand-soft: #ccfbf1;
+  --in: #15803d; --in-soft: #dcfce7;
+  --out: #c2410c; --out-soft: #ffedd5;
+  --warn: #b45309; --warn-soft: #fef3c7;
+  --danger: #b91c1c;
+  --radius: 16px; --shadow: 0 1px 2px #0000000a, 0 4px 16px #0000000d;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Be Vietnam Pro', system-ui, sans-serif; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+button { font: inherit; cursor: pointer; border: 0; }
+input, select { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+
+.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border-radius: 12px; font-weight: 600; background: var(--brand); color: #fff; transition: transform .1s, opacity .2s; }
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .5; }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.btn.in { background: var(--in); } .btn.out { background: var(--out); } .btn.danger { background: var(--danger); }
+.btn svg { width: 18px; height: 18px; }
+
+.avatar { flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 20px; color: #fff; }
+.c0 { background: #0f766e; } .c1 { background: #9333ea; } .c2 { background: #2563eb; } .c3 { background: #db2777; }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; }
+.pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.on { background: var(--in-soft); color: var(--in); }
+.pill.off { background: #f5f5f4; color: var(--muted); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+
+dialog { border: 0; border-radius: 20px; padding: 24px; width: min(420px, calc(100% - 32px)); box-shadow: 0 20px 60px #0004; color: var(--ink); }
+dialog::backdrop { background: #1c191766; backdrop-filter: blur(2px); }
+dialog h3 { margin: 0 0 4px; font-size: 20px; }
+.field { display: block; margin: 14px 0; font-size: 14px; font-weight: 600; }
+.field input, .field select { display: block; width: 100%; margin-top: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font-weight: 400; font-size: 16px; }
+.field input:focus, .field select:focus { outline: 2px solid var(--brand); border-color: transparent; }
+.actions { display: flex; gap: 10px; margin-top: 20px; } .actions .btn { flex: 1; padding: 13px; }

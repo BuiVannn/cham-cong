@@ -11,3 +11,6 @@ async function api(action, body = {}) {
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+const initial = name => esc(String(name).trim().split(/\s+/).pop().slice(0, 2) || '?'); // Trang → Tr, Thảo → Th
+// 4.25 → "4g15p"
+const hm = h => { const m = Math.round((Number(h) || 0) * 60); return `${Math.floor(m / 60)}g${m % 60 ? String(m % 60).padStart(2, '0') + 'p' : ''}`; };
