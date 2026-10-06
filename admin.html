@@ -35,7 +35,7 @@
   <section>
     <div class="bar">
       <b>Tháng</b> <input id="month" type="month">
-      <button id="add">+ Thêm ca</button>
+      <button id="add" title="Dùng khi nhân viên quên quét QR">+ Chấm bù (quên quét)</button>
       <button id="showqr" class="ghost">QR chấm công</button>
       <span id="err" class="err"></span>
     </div>
@@ -48,7 +48,7 @@
   </section>
 
   <section>
-    <h3>Chi tiết ca <small>(dòng vàng = chưa ra ca)</small></h3>
+    <h3>Các lần chấm công <small>(dòng vàng = đã vào nhưng chưa bấm ra ca)</small></h3>
     <table><thead><tr><th>Nhân viên</th><th>Vào</th><th>Ra</th><th class="num">Giờ</th><th class="num">Cách (m)</th><th>Ghi chú</th><th></th></tr></thead>
     <tbody id="list"></tbody></table>
   </section>
@@ -113,7 +113,7 @@ function edit(x) {
   f.ten.innerHTML = data.staff.map(s => `<option>${esc(s.ten)}</option>`).join('');
   f.ten.value = x?.ten || data.staff[0]?.ten;
   f.vao.value = toInput(x?.vao); f.ra.value = toInput(x?.ra); f.note.value = x?.note || '';
-  $('#dtitle').textContent = x ? 'Sửa ca' : 'Thêm ca';
+  $('#dtitle').textContent = x ? 'Sửa giờ chấm công' : 'Chấm bù cho nhân viên quên quét';
   $('#dlg').onclose = async () => {
     if ($('#dlg').returnValue !== 'ok') return;
     try { await adm('admin_save', { row: x?.row || 0, ten: f.ten.value, vao: f.vao.value, ra: f.ra.value, note: f.note.value }); }
