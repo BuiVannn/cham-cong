@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Quản lý chấm công</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 16px; background: #f5f5f5; color: #222; }
+  section { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px #0001; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; }
+  td.num, th.num { text-align: right; }
+  tr.open td { background: #fef3c7; }
+  input, select, button { font-size: 15px; padding: 8px 10px; border-radius: 6px; border: 1px solid #ccc; }
+  button { background: #2563eb; color: #fff; border: 0; cursor: pointer; }
+  button.ghost { background: #e5e7eb; color: #222; }
+  button.del { background: #dc2626; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  dialog label { display: block; margin: 8px 0; } dialog input, dialog select { width: 100%; box-sizing: border-box; }
+  #qr { display: inline-block; padding: 16px; background: #fff; }
+  .err { color: #dc2626; }
+  @media print { body * { visibility: hidden; } #qrbox, #qrbox * { visibility: visible; } #qrbox { position: absolute; inset: 0; text-align: center; } }
+</style>
+</head>
+<body>
+
+<section id="login">
+  <h2>Đăng nhập admin</h2>
+  <div class="bar"><input id="pass" type="password" placeholder="Mật khẩu"><button id="go">Vào</button></div>
+  <p id="lerr" class="err"></p>
+</section>
+
+<div id="app" hidden>
+  <section>
+    <div class="bar">
+      <b>Tháng</b> <input id="month" type="month">
+      <button id="add">+ Thêm ca</button>
+      <button id="showqr" class="ghost">QR chấm công</button>
+      <span id="err" class="err"></span>
+    </div>
+  </section>
+
+  <section>
+    <h3>Tổng hợp</h3>
+    <table><thead><tr><th>Nhân viên</th><th class="num">Số ca</th><th class="num">Tổng giờ</th><th class="num">Lương/giờ</th><th class="num">Thành tiền</th><th></th></tr></thead>
+    <tbody id="sum"></tbody></table>
+  </section>
+
+  <section>
+    <h3>Chi tiết ca <small>(dòng vàng = chưa ra ca)</small></h3>
+    <table><thead><tr><th>Nhân viên</th><th>Vào</th><th>Ra</th><th class="num">Giờ</th><th class="num">Cách (m)</th><th>Ghi chú</th><th></th></tr></thead>
+    <tbody id="list"></tbody></table>
+  </section>
+
+  <section id="qrbox" hidden>
+    <h2>Quét để chấm công</h2>
+    <div id="qr"></div>
+    <p id="qrurl"></p>
+    <button onclick="print()" class="ghost">In</button>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog" id="form">
+    <h3 id="dtitle"></h3>
+    <label>Nhân viên <select name="ten"></select></label>
+    <label>Giờ vào <input name="vao" type="datetime-local" required></label>
+    <label>Giờ ra <input name="ra" type="datetime-local"></label>
+    <label>Ghi chú <input name="note"></label>
+    <div class="bar"><button value="ok">Lưu</button><button value="cancel" class="ghost" formnovalidate>Huỷ</button></div>
+  </form>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="api.js"></script>
+<script>
+let pass = sessionStorage.getItem('pass') || '';
+let data = { shifts: [], staff: [] };
+const adm = (action, body = {}) => api(action, { pass, ...body });
+const money = n => Math.round(n).toLocaleString('vi-VN') + 'đ';
+const toInput = s => s ? s.replace(' ', 'T') : '';
+
+$('#month').value = new Date().toLocaleDateString('sv').slice(0, 7); // yyyy-MM theo giờ máy
+
+async function load() {
+  $('#err').textContent = '';
+  try {
+    data = await adm('admin_list', { month: $('#month').value });
+  } catch (e) {
+    if (e.message === 'Sai mật khẩu') { sessionStorage.removeItem('pass'); $('#app').hidden = true; $('#login').hidden = false; $('#lerr').textContent = e.message; return; }
+    return $('#err').textContent = e.message;
+  }
+  $('#login').hidden = true; $('#app').hidden = false;
+  sessionStorage.setItem('pass', pass);
+
+  $('#sum').innerHTML = data.staff.map(s => {
+    const mine = data.shifts.filter(x => x.ten === s.ten);
+    const gio = mine.reduce((t, x) => t + (Number(x.gio) || 0), 0);
+    return `<tr><td>${esc(s.ten)}</td><td class="num">${mine.length}</td><td class="num">${gio}</td>
+      <td class="num">${money(s.luong)}</td><td class="num"><b>${money(gio * s.luong)}</b></td>
+      <td><button class="ghost" data-reset="${esc(s.ten)}">Reset máy</button></td></tr>`;
+  }).join('');
+
+  $('#list').innerHTML = data.shifts.map((x, i) => `<tr class="${x.ra ? '' : 'open'}">
+      <td>${esc(x.ten)}</td><td>${esc(x.vao)}</td><td>${esc(x.ra)}</td><td class="num">${esc(x.gio)}</td>
+      <td class="num">${esc(x.kc)}</td><td>${esc(x.note)}</td>
+      <td><button class="ghost" data-edit="${i}">Sửa</button> <button class="del" data-del="${i}">Xoá</button></td></tr>`).join('');
+}
+
+function edit(x) {
+  const f = $('#form');
+  f.ten.innerHTML = data.staff.map(s => `<option>${esc(s.ten)}</option>`).join('');
+  f.ten.value = x?.ten || data.staff[0]?.ten;
+  f.vao.value = toInput(x?.vao); f.ra.value = toInput(x?.ra); f.note.value = x?.note || '';
+  $('#dtitle').textContent = x ? 'Sửa ca' : 'Thêm ca';
+  $('#dlg').onclose = async () => {
+    if ($('#dlg').returnValue !== 'ok') return;
+    try { await adm('admin_save', { row: x?.row || 0, ten: f.ten.value, vao: f.vao.value, ra: f.ra.value, note: f.note.value }); }
+    catch (e) { $('#err').textContent = e.message; }
+    load();
+  };
+  $('#dlg').showModal();
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.dataset;
+  if (b.edit) edit(data.shifts[b.edit]);
+  if (b.del) {
+    const x = data.shifts[b.del];
+    if (confirm(`Xoá ca của ${x.ten} lúc ${x.vao}?`)) { await adm('admin_delete', { row: x.row }).catch(e => alert(e.message)); load(); }
+  }
+  if (b.reset && confirm(`Cho phép ${b.reset} đăng ký lại trên máy mới?`)) {
+    await adm('admin_reset_device', { ten: b.reset }).catch(e => alert(e.message)); alert('Đã reset. Nhân viên quét QR và nhập lại PIN trên máy mới.');
+  }
+});
+
+$('#go').onclick = () => { pass = $('#pass').value; load(); };
+$('#pass').onkeydown = e => e.key === 'Enter' && $('#go').click();
+$('#month').onchange = load;
+$('#add').onclick = () => edit(null);
+$('#showqr').onclick = () => {
+  const url = new URL('./', location.href).href; // trang chấm công index.html
+  $('#qr').innerHTML = ''; new QRCode($('#qr'), { text: url, width: 256, height: 256 });
+  $('#qrurl').textContent = url; $('#qrbox').hidden = false; $('#qrbox').scrollIntoView();
+};
+
+if (pass) load();
+</script>
+</body>
+</html>

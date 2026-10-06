@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chấm công</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 420px; margin: 0 auto; padding: 24px 16px; text-align: center; background: #f5f5f5; color: #222; }
+  .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px #0001; }
+  select, input, button { width: 100%; font-size: 18px; padding: 12px; margin: 6px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+  button { border: 0; color: #fff; background: #2563eb; font-weight: 600; }
+  button.out { background: #dc2626; }
+  button:disabled { opacity: .5; }
+  #msg { min-height: 1.5em; margin-top: 12px; }
+  .err { color: #dc2626; } .ok { color: #16a34a; }
+  a { color: #666; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>Chấm công</h2>
+
+  <div id="reg" hidden>
+    <p>Lần đầu dùng máy này — chọn tên và nhập PIN</p>
+    <select id="name"></select>
+    <input id="pin" type="password" inputmode="numeric" placeholder="PIN">
+    <button id="save">Lưu</button>
+  </div>
+
+  <div id="main" hidden>
+    <p>Xin chào <b id="who"></b></p>
+    <p id="state"></p>
+    <button id="punch"></button>
+    <p><a href="#" id="logout">Không phải bạn?</a></p>
+  </div>
+
+  <div id="msg"></div>
+</div>
+
+<script src="api.js"></script>
+<script>
+let me = JSON.parse(localStorage.getItem('me') || 'null');
+let inShift = false;
+const say = (t, cls = '') => { $('#msg').className = cls; $('#msg').textContent = t; };
+
+async function load() {
+  if (!me) {
+    $('#reg').hidden = false; $('#main').hidden = true;
+    const names = await api('names');
+    $('#name').innerHTML = names.map(n => `<option>${esc(n)}</option>`).join('');
+    return;
+  }
+  $('#reg').hidden = true; $('#main').hidden = false;
+  $('#who').textContent = me.name;
+  const vao = await api('status', me);
+  inShift = !!vao;
+  $('#state').textContent = vao ? `Đang trong ca từ ${vao}` : 'Chưa vào ca';
+  $('#punch').textContent = vao ? 'RA CA' : 'VÀO CA';
+  $('#punch').className = vao ? 'out' : '';
+}
+
+$('#save').onclick = async () => {
+  me = { name: $('#name').value, pin: $('#pin').value, device: localStorage.getItem('device') || crypto.randomUUID() };
+  localStorage.setItem('device', me.device);
+  try {
+    await api('status', me); // kiểm tra PIN + gắn máy
+    localStorage.setItem('me', JSON.stringify(me));
+    say(''); load();
+  } catch (e) { me = null; say(e.message, 'err'); }
+};
+
+$('#logout').onclick = e => { e.preventDefault(); localStorage.removeItem('me'); me = null; say(''); load(); };
+
+$('#punch').onclick = () => {
+  $('#punch').disabled = true; say('Đang lấy vị trí...');
+  navigator.geolocation.getCurrentPosition(async p => {
+    try {
+      const t = await api('punch', { ...me, type: inShift ? 'out' : 'in', lat: p.coords.latitude, lng: p.coords.longitude });
+      say(`${inShift ? 'Ra ca' : 'Vào ca'} lúc ${t} ✓`, 'ok');
+      await load();
+    } catch (e) { say(e.message, 'err'); }
+    $('#punch').disabled = false;
+  }, err => {
+    say('Không lấy được vị trí. Hãy bật GPS và cho phép trình duyệt truy cập vị trí. (' + err.message + ')', 'err');
+    $('#punch').disabled = false;
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+};
+
+load().catch(e => say(e.message, 'err'));
+</script>
+</body>
+</html>
