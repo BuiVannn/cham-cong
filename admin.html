@@ -27,7 +27,7 @@
 
 <section id="login">
   <h2>Đăng nhập admin</h2>
-  <div class="bar"><input id="pass" type="password" placeholder="Mật khẩu"><button id="go">Vào</button></div>
+  <form class="bar" id="lform"><input id="pass" type="password" placeholder="Mật khẩu" autocomplete="current-password" required><button id="go">Vào</button></form>
   <p id="lerr" class="err"></p>
 </section>
 
@@ -43,7 +43,7 @@
 
   <section>
     <h3>Tổng hợp</h3>
-    <table><thead><tr><th>Nhân viên</th><th class="num">Số ca</th><th class="num">Tổng giờ</th><th class="num">Lương/giờ</th><th class="num">Thành tiền</th><th></th></tr></thead>
+    <table><thead><tr><th>Nhân viên</th><th class="num">Số ca</th><th class="num">Tổng giờ</th><th class="num">Lương/giờ</th><th class="num">Thành tiền</th></tr></thead>
     <tbody id="sum"></tbody></table>
   </section>
 
@@ -85,21 +85,21 @@ $('#month').value = new Date().toLocaleDateString('sv').slice(0, 7); // yyyy-MM 
 
 async function load() {
   $('#err').textContent = '';
+  $('#lerr').textContent = $('#app').hidden ? 'Đang đăng nhập...' : '';
   try {
     data = await adm('admin_list', { month: $('#month').value });
   } catch (e) {
     if (e.message === 'Sai mật khẩu') { sessionStorage.removeItem('pass'); $('#app').hidden = true; $('#login').hidden = false; $('#lerr').textContent = e.message; return; }
-    return $('#err').textContent = e.message;
+    return $($('#app').hidden ? '#lerr' : '#err').textContent = 'Lỗi: ' + e.message;
   }
-  $('#login').hidden = true; $('#app').hidden = false;
+  $('#login').hidden = true; $('#app').hidden = false; $('#lerr').textContent = '';
   sessionStorage.setItem('pass', pass);
 
   $('#sum').innerHTML = data.staff.map(s => {
     const mine = data.shifts.filter(x => x.ten === s.ten);
     const gio = mine.reduce((t, x) => t + (Number(x.gio) || 0), 0);
     return `<tr><td>${esc(s.ten)}</td><td class="num">${mine.length}</td><td class="num">${gio}</td>
-      <td class="num">${money(s.luong)}</td><td class="num"><b>${money(gio * s.luong)}</b></td>
-      <td><button class="ghost" data-reset="${esc(s.ten)}">Reset máy</button></td></tr>`;
+      <td class="num">${money(s.luong)}</td><td class="num"><b>${money(gio * s.luong)}</b></td></tr>`;
   }).join('');
 
   $('#list').innerHTML = data.shifts.map((x, i) => `<tr class="${x.ra ? '' : 'open'}">
@@ -130,13 +130,9 @@ document.addEventListener('click', async e => {
     const x = data.shifts[b.del];
     if (confirm(`Xoá ca của ${x.ten} lúc ${x.vao}?`)) { await adm('admin_delete', { row: x.row }).catch(e => alert(e.message)); load(); }
   }
-  if (b.reset && confirm(`Cho phép ${b.reset} đăng ký lại trên máy mới?`)) {
-    await adm('admin_reset_device', { ten: b.reset }).catch(e => alert(e.message)); alert('Đã reset. Nhân viên quét QR và nhập lại PIN trên máy mới.');
-  }
 });
 
-$('#go').onclick = () => { pass = $('#pass').value; load(); };
-$('#pass').onkeydown = e => e.key === 'Enter' && $('#go').click();
+$('#lform').onsubmit = e => { e.preventDefault(); pass = $('#pass').value.trim(); load(); };
 $('#month').onchange = load;
 $('#add').onclick = () => edit(null);
 $('#showqr').onclick = () => {
