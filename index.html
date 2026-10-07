@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f4f1ec">
 <title>Chấm công</title>
+<link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -35,6 +36,8 @@
   #done svg { width: 96px; height: 96px; margin: 0 auto 16px; }
   #done .t1 { font-size: 26px; font-weight: 700; } #done .t2 { font-size: 56px; font-weight: 800; }
   @keyframes fade { from { opacity: 0; transform: scale(.96); } }
+  .state { text-align: center; padding: 28px 20px; color: var(--muted); }
+  .state .btn { margin-top: 14px; }
 </style>
 </head>
 <body>
@@ -45,7 +48,7 @@
     <div id="date"></div>
   </header>
   <p class="hint">Bấm nút dưới tên của bạn</p>
-  <div id="list"><div class="card staff skeleton"></div><div class="card staff skeleton"></div></div>
+  <div id="list"></div>
 </main>
 
 <div id="toast" hidden></div>
@@ -109,7 +112,15 @@ function render() {
     </div>`).join('');
 }
 
-async function load() { board = await api('board'); render(); }
+async function load() {
+  if (!board.length) $('#list').innerHTML = '<div class="card staff skeleton"></div><div class="card staff skeleton"></div><p class="hint" id="slow"></p>';
+  const slow = setTimeout(() => $('#slow') && ($('#slow').textContent = 'Đang kết nối máy chủ, có thể mất 5–10 giây...'), 3000);
+  try { board = await api('board'); render(); }
+  catch (e) {
+    if (!board.length) $('#list').innerHTML = `<div class="card state">${esc(e.message)}<br><button class="btn" onclick="load()">Thử lại</button></div>`;
+    else toast(e.message);
+  } finally { clearTimeout(slow); }
+}
 setInterval(() => board.length && render(), 60000);
 
 $('#list').onclick = e => {
@@ -138,14 +149,19 @@ $('#sYes').onclick = () => {
       $('#dTime').textContent = t.slice(11); $('#done').hidden = false;
       setTimeout(() => $('#done').hidden = true, 2500);
       await load();
-    } catch (err) { $('#sheet').close(); toast(err.message); }
+    } catch (err) {
+      $('#sheet').close();
+      // Rớt mạng giữa chừng: không biết server đã ghi chưa → tải lại trạng thái để nhân viên tự xem
+      if (err instanceof NetError) { toast('Mạng chập chờn, chưa chắc đã chấm được. Xem trạng thái bên trên: nếu chưa đổi thì bấm lại.'); load(); }
+      else toast(err.message);
+    }
   }, () => {
     $('#sheet').close();
     toast('Không lấy được vị trí. Hãy bật Định vị và cho phép trang truy cập vị trí. Nếu đang mở trong Zalo: bấm ⋯ → Mở bằng trình duyệt.');
   }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
 };
 
-load().catch(e => toast(e.message));
+load();
 </script>
 </body>
 </html>
