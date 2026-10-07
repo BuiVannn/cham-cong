@@ -112,10 +112,15 @@ function render() {
     </div>`).join('');
 }
 
+// Nhớ trạng thái lần trước để quét QR là hiện ngay; dữ liệu mới tải ngầm (Apps Script mất 2–9 giây mỗi lần gọi)
+const saved = { get() { try { return JSON.parse(localStorage.getItem('board')) || []; } catch { return []; } },
+                set(b) { try { localStorage.setItem('board', JSON.stringify(b)); } catch {} } };
+
 async function load() {
+  if (!board.length && (board = saved.get()).length) render();
   if (!board.length) $('#list').innerHTML = '<div class="card staff skeleton"></div><div class="card staff skeleton"></div><p class="hint" id="slow"></p>';
   const slow = setTimeout(() => $('#slow') && ($('#slow').textContent = 'Đang kết nối máy chủ, có thể mất 5–10 giây...'), 3000);
-  try { board = await api('board'); render(); }
+  try { board = await api('board'); saved.set(board); render(); }
   catch (e) {
     if (!board.length) $('#list').innerHTML = `<div class="card state">${esc(e.message)}<br><button class="btn" onclick="load()">Thử lại</button></div>`;
     else toast(e.message);
@@ -155,7 +160,7 @@ $('#sYes').onclick = async () => {
   btn.textContent = 'Đang ghi công...';
   try {
     const r = await api('punch', { name: x.ten, type, lat: p.coords.latitude, lng: p.coords.longitude });
-    board = r.board; render();
+    board = r.board; saved.set(board); render();
     $('#sheet').close();
     $('#done').className = type; $('#dText').textContent = `${x.ten} đã ${type === 'in' ? 'vào ca' : 'ra ca'}`;
     $('#dTime').textContent = r.time.slice(11); $('#done').hidden = false;
@@ -164,7 +169,7 @@ $('#sYes').onclick = async () => {
     $('#sheet').close();
     // Rớt mạng giữa chừng: không biết server đã ghi chưa → tải lại trạng thái để nhân viên tự xem
     if (err instanceof NetError) { toast('Mạng chập chờn, chưa chắc đã chấm được. Xem trạng thái bên trên: nếu chưa đổi thì bấm lại.'); load(); }
-    else toast(err.message);
+    else { toast(err.message); load(); } // vd "đang trong ca" do trạng thái cũ → tải lại trạng thái đúng
   }
 };
 
